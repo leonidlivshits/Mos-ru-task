@@ -7,6 +7,7 @@ import httpx
 from app.telegram_bot.backend_client import BackendApiError, BackendClient, ClaimCheckResult, LostRequestMatch, LostRequestResult
 from app.telegram_bot.dates import parse_lost_date
 from app.telegram_bot.formatting import format_claim_check_result, format_lost_request_result
+from app.telegram_bot.messages import claim_feature_prompt
 
 
 def test_parse_lost_date_supports_iso_and_ru_formats() -> None:
@@ -59,6 +60,13 @@ def test_format_claim_check_result() -> None:
     assert "Проверка заявки #7" in text
     assert "Скрытый признак совпал" in text
     assert "подтверждена" in text
+
+
+def test_claim_feature_prompt_escapes_item_title() -> None:
+    text = claim_feature_prompt("Рюкзак <Nike>")
+
+    assert "Для демо проверим самый вероятный вариант." in text
+    assert "Рюкзак &lt;Nike&gt;" in text
 
 
 def test_backend_client_creates_lost_request() -> None:
