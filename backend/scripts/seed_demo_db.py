@@ -3,16 +3,13 @@ from __future__ import annotations
 import asyncio
 from datetime import date
 
-from sqlalchemy import delete
+from sqlalchemy import text
 
 from app.db.models import (
     Color,
     FoundItem,
-    LostRequest,
     MetroStation,
-    RequestMatch,
     StorageLocation,
-    found_item_colors,
 )
 from app.db.session import SessionLocal
 
@@ -293,13 +290,21 @@ FOUND_ITEMS = [
 
 async def seed() -> None:
     async with SessionLocal() as db:
-        await db.execute(delete(RequestMatch))
-        await db.execute(delete(LostRequest))
-        await db.execute(delete(found_item_colors))
-        await db.execute(delete(FoundItem))
-        await db.execute(delete(Color))
-        await db.execute(delete(MetroStation))
-        await db.execute(delete(StorageLocation))
+        await db.execute(
+            text(
+                """
+                TRUNCATE TABLE
+                    request_matches,
+                    lost_requests,
+                    found_item_colors,
+                    found_items,
+                    colors,
+                    metro_stations,
+                    storage_locations
+                RESTART IDENTITY CASCADE
+                """
+            )
+        )
         await db.commit()
 
         stations = {
