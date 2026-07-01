@@ -7,6 +7,7 @@ ENV PYTHONPATH=/app/backend
 WORKDIR /app
 
 COPY pyproject.toml ./
+COPY alembic.ini ./
 COPY backend ./backend
 
 RUN pip install --no-cache-dir --upgrade pip \
