@@ -9,6 +9,21 @@ class LostRequestCreate(BaseModel):
     station_id: int = Field(gt=0)
 
 
+class LostRequestMatch(BaseModel):
+    item_id: int
+    title: str
+    public_description: str
+    score: float
+    matched_by: list[str]
+    found_date: date
+    station: str
+    line: str
+    storage: str
+    colors: list[str]
+
+
 class LostRequestCreated(BaseModel):
     request_id: int
     status: str
+    message: str
+    matches: list[LostRequestMatch]

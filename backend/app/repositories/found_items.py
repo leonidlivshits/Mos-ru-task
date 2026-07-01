@@ -21,3 +21,17 @@ class FoundItemsRepository:
         )
         result = await self.db.execute(statement)
         return list(result.unique().scalars())
+
+    async def list_available_for_matching(self) -> list[FoundItem]:
+        statement = (
+            select(FoundItem)
+            .where(FoundItem.status == "available")
+            .options(
+                joinedload(FoundItem.colors),
+                joinedload(FoundItem.station),
+                joinedload(FoundItem.storage),
+            )
+            .order_by(FoundItem.found_date.desc(), FoundItem.id)
+        )
+        result = await self.db.execute(statement)
+        return list(result.unique().scalars())
