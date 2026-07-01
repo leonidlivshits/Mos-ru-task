@@ -42,6 +42,15 @@ class LostRequestResult:
     matches: list[LostRequestMatch]
 
 
+@dataclass(frozen=True)
+class ClaimCheckResult:
+    request_id: int
+    found_item_id: int
+    status: str
+    verified: bool
+    message: str
+
+
 class BackendClient:
     def __init__(
         self,
@@ -102,6 +111,29 @@ class BackendClient:
                 )
                 for item in data["matches"]
             ],
+        )
+
+    async def claim_check(
+        self,
+        *,
+        request_id: int,
+        found_item_id: int,
+        answer: str,
+    ) -> ClaimCheckResult:
+        data = await self._request(
+            "POST",
+            f"/lost-requests/{request_id}/claim-check",
+            json={
+                "found_item_id": found_item_id,
+                "answer": answer,
+            },
+        )
+        return ClaimCheckResult(
+            request_id=data["request_id"],
+            found_item_id=data["found_item_id"],
+            status=data["status"],
+            verified=data["verified"],
+            message=data["message"],
         )
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:

@@ -31,6 +31,9 @@ class LostRequestsRepository:
         await self.db.refresh(lost_request)
         return lost_request
 
+    async def get_by_id(self, request_id: int) -> LostRequest | None:
+        return await self.db.get(LostRequest, request_id)
+
     async def update_status(self, lost_request: LostRequest, status: str) -> LostRequest:
         lost_request.status = status
         await self.db.commit()

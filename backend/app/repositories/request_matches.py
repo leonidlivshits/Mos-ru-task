@@ -1,4 +1,4 @@
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import RequestMatch
@@ -23,3 +23,11 @@ class RequestMatchesRepository:
                 for match in matches
             ]
         )
+
+    async def exists(self, request_id: int, found_item_id: int) -> bool:
+        statement = select(RequestMatch).where(
+            RequestMatch.request_id == request_id,
+            RequestMatch.found_item_id == found_item_id,
+        )
+        result = await self.db.execute(statement)
+        return result.scalar_one_or_none() is not None

@@ -22,6 +22,9 @@ class FoundItemsRepository:
         result = await self.db.execute(statement)
         return list(result.unique().scalars())
 
+    async def get_by_id(self, item_id: int) -> FoundItem | None:
+        return await self.db.get(FoundItem, item_id)
+
     async def list_available_for_matching(self) -> list[FoundItem]:
         statement = (
             select(FoundItem)

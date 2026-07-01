@@ -29,3 +29,16 @@ class LostRequestCreated(BaseModel):
     status: str
     message: str
     matches: list[LostRequestMatch]
+
+
+class ClaimCheckCreate(BaseModel):
+    found_item_id: int = Field(gt=0)
+    answer: str = Field(min_length=2, max_length=500)
+
+
+class ClaimCheckResponse(BaseModel):
+    request_id: int
+    found_item_id: int
+    status: str
+    verified: bool
+    message: str

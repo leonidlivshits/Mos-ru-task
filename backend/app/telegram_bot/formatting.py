@@ -1,6 +1,6 @@
 from html import escape
 
-from app.telegram_bot.backend_client import LostRequestResult
+from app.telegram_bot.backend_client import ClaimCheckResult, LostRequestResult
 
 
 def format_lost_request_result(result: LostRequestResult) -> str:
@@ -36,3 +36,14 @@ def format_lost_request_result(result: LostRequestResult) -> str:
     lines.append("")
     lines.append("Для подтверждения в реальном сервисе нужно будет назвать скрытый признак вещи.")
     return "\n".join(lines)
+
+
+def format_claim_check_result(result: ClaimCheckResult) -> str:
+    status = "подтверждена" if result.verified else "не подтверждена"
+    return "\n".join(
+        [
+            f"<b>Проверка заявки #{result.request_id}</b>",
+            escape(result.message),
+            f"Статус: {status}",
+        ]
+    )

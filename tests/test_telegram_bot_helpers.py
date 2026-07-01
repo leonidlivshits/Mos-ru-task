@@ -4,9 +4,9 @@ from datetime import date
 
 import httpx
 
-from app.telegram_bot.backend_client import BackendApiError, BackendClient, LostRequestMatch, LostRequestResult
+from app.telegram_bot.backend_client import BackendApiError, BackendClient, ClaimCheckResult, LostRequestMatch, LostRequestResult
 from app.telegram_bot.dates import parse_lost_date
-from app.telegram_bot.formatting import format_lost_request_result
+from app.telegram_bot.formatting import format_claim_check_result, format_lost_request_result
 
 
 def test_parse_lost_date_supports_iso_and_ru_formats() -> None:
@@ -45,6 +45,22 @@ def test_format_lost_request_result_escapes_html() -> None:
     assert "vector 0.90" in text
 
 
+def test_format_claim_check_result() -> None:
+    result = ClaimCheckResult(
+        request_id=7,
+        found_item_id=1,
+        status="verified_demo",
+        verified=True,
+        message="Скрытый признак совпал",
+    )
+
+    text = format_claim_check_result(result)
+
+    assert "Проверка заявки #7" in text
+    assert "Скрытый признак совпал" in text
+    assert "подтверждена" in text
+
+
 def test_backend_client_creates_lost_request() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
@@ -58,7 +74,7 @@ def test_backend_client_creates_lost_request() -> None:
             201,
             json={
                 "request_id": 7,
-                "status": "matched",
+                "status": "claim_pending",
                 "message": "Нашли похожие вещи",
                 "matches": [],
             },
@@ -75,7 +91,42 @@ def test_backend_client_creates_lost_request() -> None:
             )
 
         assert result.request_id == 7
-        assert result.status == "matched"
+        assert result.status == "claim_pending"
+
+    asyncio.run(run())
+
+
+def test_backend_client_sends_claim_check() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert str(request.url) == "http://backend/lost-requests/7/claim-check"
+        assert json.loads(request.content.decode()) == {
+            "found_item_id": 1,
+            "answer": "синяя папка",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "request_id": 7,
+                "found_item_id": 1,
+                "status": "verified_demo",
+                "verified": True,
+                "message": "Скрытый признак совпал",
+            },
+        )
+
+    async def run() -> None:
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(base_url="http://backend", transport=transport) as http_client:
+            client = BackendClient("http://backend", client=http_client)
+            result = await client.claim_check(
+                request_id=7,
+                found_item_id=1,
+                answer="синяя папка",
+            )
+
+        assert result.verified is True
+        assert result.status == "verified_demo"
 
     asyncio.run(run())
 

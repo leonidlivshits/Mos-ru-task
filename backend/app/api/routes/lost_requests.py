@@ -6,7 +6,14 @@ from app.repositories.found_items import FoundItemsRepository
 from app.repositories.lost_requests import LostRequestsRepository
 from app.repositories.request_matches import RequestMatchesRepository
 from app.repositories.stations import StationsRepository
-from app.schemas.lost_requests import LostRequestCreate, LostRequestCreated, LostRequestMatch
+from app.schemas.lost_requests import (
+    ClaimCheckCreate,
+    ClaimCheckResponse,
+    LostRequestCreate,
+    LostRequestCreated,
+    LostRequestMatch,
+)
+from app.services.claim_check import ClaimCheckService
 from app.services.embedding_service import EmbeddingServiceError, OpenRouterEmbeddingService
 from app.services.input_guard import InputGuard, InputGuardError
 from app.services.matching import MatchingService
@@ -108,4 +115,68 @@ async def create_lost_request(
             )
             for match in matches
         ],
+    )
+
+
+@router.post(
+    "/lost-requests/{request_id}/claim-check",
+    response_model=ClaimCheckResponse,
+)
+async def claim_check(
+    request_id: int,
+    payload: ClaimCheckCreate,
+    db: AsyncSession = Depends(get_db),
+) -> ClaimCheckResponse:
+    lost_requests = LostRequestsRepository(db)
+    lost_request = await lost_requests.get_by_id(request_id)
+    if lost_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Заявка не найдена",
+        )
+
+    is_matched_item = await RequestMatchesRepository(db).exists(
+        request_id=request_id,
+        found_item_id=payload.found_item_id,
+    )
+    if not is_matched_item:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Эта вещь не относится к найденным совпадениям заявки",
+        )
+
+    found_item = await FoundItemsRepository(db).get_by_id(payload.found_item_id)
+    if found_item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Найденная вещь не найдена",
+        )
+
+    if lost_request.status == "verified_demo":
+        return ClaimCheckResponse(
+            request_id=lost_request.id,
+            found_item_id=payload.found_item_id,
+            status=lost_request.status,
+            verified=True,
+            message="Заявка уже подтверждена в демо.",
+        )
+
+    result = ClaimCheckService().verify(
+        answer=payload.answer,
+        private_features=found_item.private_features,
+    )
+
+    if result.verified:
+        lost_request = await lost_requests.update_status(lost_request, "verified_demo")
+        message = "Скрытый признак совпал. В демо заявка считается подтвержденной."
+    else:
+        lost_request = await lost_requests.update_status(lost_request, "claim_pending")
+        message = "Скрытый признак не совпал. Вещь нельзя подтвердить по этому ответу."
+
+    return ClaimCheckResponse(
+        request_id=lost_request.id,
+        found_item_id=payload.found_item_id,
+        status=lost_request.status,
+        verified=result.verified,
+        message=message,
     )

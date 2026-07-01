@@ -1,3 +1,5 @@
+from html import escape
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -5,7 +7,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.telegram_bot.backend_client import BackendApiError, BackendClient
 from app.telegram_bot.dates import parse_lost_date
-from app.telegram_bot.formatting import format_lost_request_result
+from app.telegram_bot.formatting import format_claim_check_result, format_lost_request_result
 from app.telegram_bot.keyboards import stations_keyboard
 from app.telegram_bot.states import LostItemFlow
 
@@ -101,9 +103,51 @@ async def receive_station(
             await callback.message.answer(f"Не удалось создать заявку: {exc}\nНачните заново через /start.")
         return
 
-    await state.clear()
     if callback.message:
         await callback.message.answer(format_lost_request_result(result))
+
+    if not result.matches:
+        await state.clear()
+        return
+
+    best_match = result.matches[0]
+    await state.update_data(
+        request_id=result.request_id,
+        claim_item_id=best_match.item_id,
+        claim_item_title=best_match.title,
+    )
+    await state.set_state(LostItemFlow.claim_feature)
+    if callback.message:
+        await callback.message.answer(
+            "Для демо проверим самый вероятный вариант.\n"
+            f"Напишите скрытый признак вещи: что было внутри или какая особая примета у «{escape(best_match.title)}»?"
+        )
+
+
+@router.message(LostItemFlow.claim_feature)
+async def receive_claim_feature(
+    message: Message,
+    state: FSMContext,
+    backend_client: BackendClient,
+) -> None:
+    if not message.text:
+        await message.answer("Отправьте скрытый признак текстом.")
+        return
+
+    data = await state.get_data()
+    try:
+        result = await backend_client.claim_check(
+            request_id=data["request_id"],
+            found_item_id=data["claim_item_id"],
+            answer=message.text.strip(),
+        )
+    except BackendApiError as exc:
+        await state.clear()
+        await message.answer(f"Не удалось проверить признак: {exc}\nНачните заново через /start.")
+        return
+
+    await state.clear()
+    await message.answer(format_claim_check_result(result))
 
 
 @router.message()

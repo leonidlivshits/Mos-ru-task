@@ -4,7 +4,7 @@ from app.services.matching import FoundItemMatch
 class ResponseService:
     def status_for_matches(self, matches: list[FoundItemMatch]) -> str:
         if matches:
-            return "matched"
+            return "claim_pending"
         return "no_matches"
 
     def message_for_matches(self, matches: list[FoundItemMatch]) -> str:
