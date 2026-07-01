@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.repositories.found_items import FoundItemsRepository
@@ -9,15 +9,13 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 
 
 @router.get("/found-items", response_model=list[DemoFoundItem])
-def list_demo_found_items(db: Session = Depends(get_db)) -> list[DemoFoundItem]:
-    items = FoundItemsRepository(db).list_demo_items()
+async def list_demo_found_items(db: AsyncSession = Depends(get_db)) -> list[DemoFoundItem]:
+    items = await FoundItemsRepository(db).list_demo_items()
     return [
         DemoFoundItem(
             id=item.id,
             title=item.title,
-            description=item.description,
             public_description=item.public_description,
-            private_features=item.private_features,
             category=item.category,
             brand=item.brand,
             colors=[color.name for color in item.colors],
@@ -30,4 +28,3 @@ def list_demo_found_items(db: Session = Depends(get_db)) -> list[DemoFoundItem]:
         )
         for item in items
     ]
-

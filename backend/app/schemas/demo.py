@@ -8,9 +8,7 @@ class DemoFoundItem(BaseModel):
 
     id: int
     title: str
-    description: str
     public_description: str
-    private_features: list[str]
     category: str
     brand: str | None
     colors: list[str]
@@ -20,4 +18,3 @@ class DemoFoundItem(BaseModel):
     storage: str
     status: str
     has_embedding: bool
-

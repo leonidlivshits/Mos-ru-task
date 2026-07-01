@@ -1,14 +1,15 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.db.models import FoundItem
 
 
 class FoundItemsRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def list_demo_items(self) -> list[FoundItem]:
+    async def list_demo_items(self) -> list[FoundItem]:
         statement = (
             select(FoundItem)
             .options(
@@ -18,5 +19,5 @@ class FoundItemsRepository:
             )
             .order_by(FoundItem.found_date.desc(), FoundItem.id)
         )
-        return list(self.db.execute(statement).unique().scalars())
-
+        result = await self.db.execute(statement)
+        return list(result.unique().scalars())

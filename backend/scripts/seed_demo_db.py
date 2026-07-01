@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 from sqlalchemy import delete
@@ -290,16 +291,16 @@ FOUND_ITEMS = [
 ]
 
 
-def seed() -> None:
-    with SessionLocal() as db:
-        db.execute(delete(RequestMatch))
-        db.execute(delete(LostRequest))
-        db.execute(delete(found_item_colors))
-        db.execute(delete(FoundItem))
-        db.execute(delete(Color))
-        db.execute(delete(MetroStation))
-        db.execute(delete(StorageLocation))
-        db.commit()
+async def seed() -> None:
+    async with SessionLocal() as db:
+        await db.execute(delete(RequestMatch))
+        await db.execute(delete(LostRequest))
+        await db.execute(delete(found_item_colors))
+        await db.execute(delete(FoundItem))
+        await db.execute(delete(Color))
+        await db.execute(delete(MetroStation))
+        await db.execute(delete(StorageLocation))
+        await db.commit()
 
         stations = {
             data["name"]: MetroStation(**data)
@@ -311,7 +312,7 @@ def seed() -> None:
             for data in STORAGES
         }
         db.add_all([*stations.values(), *colors.values(), *storages.values()])
-        db.flush()
+        await db.flush()
 
         for data in FOUND_ITEMS:
             item_data = data.copy()
@@ -326,9 +327,9 @@ def seed() -> None:
             )
             db.add(item)
 
-        db.commit()
+        await db.commit()
 
 
 if __name__ == "__main__":
-    seed()
+    asyncio.run(seed())
     print(f"Seeded demo database with {len(FOUND_ITEMS)} found items.")
