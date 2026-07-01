@@ -22,6 +22,24 @@ services:
       - ./backend:/app/backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  bot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    profiles:
+      - bot
+    environment:
+      APP_NAME: ${APP_NAME:-Mos.ru Lost Items Demo}
+      APP_ENV: ${APP_ENV:-local}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      BACKEND_API_URL: ${BACKEND_API_URL:-http://api:8000}
+    depends_on:
+      api:
+        condition: service_started
+    volumes:
+      - ./backend:/app/backend
+    command: python -m app.telegram_bot.main
+
   db:
     image: pgvector/pgvector:pg16
     environment:

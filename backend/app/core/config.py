@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     openrouter_embedding_dimensions: int = 384
     openrouter_http_referer: str = "http://localhost:8000"
     openrouter_app_title: str = "Mos.ru Lost Items Demo"
+    telegram_bot_token: str = ""
+    backend_api_url: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
