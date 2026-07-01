@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings>=2.4.0,<3.0.0",
     "SQLAlchemy>=2.0.0,<3.0.0",
     "psycopg[binary]>=3.2.0,<4.0.0",
+    "alembic>=1.14.0,<2.0.0",
+    "pgvector>=0.3.0,<1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -27,4 +29,3 @@ pythonpath = ["backend"]
 
 [tool.setuptools.packages.find]
 where = ["backend"]
-

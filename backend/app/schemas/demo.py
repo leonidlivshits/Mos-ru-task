@@ -1,0 +1,23 @@
+from datetime import date
+
+from pydantic import BaseModel, ConfigDict
+
+
+class DemoFoundItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    description: str
+    public_description: str
+    private_features: list[str]
+    category: str
+    brand: str | None
+    colors: list[str]
+    found_date: date
+    station: str
+    line: str
+    storage: str
+    status: str
+    has_embedding: bool
+
