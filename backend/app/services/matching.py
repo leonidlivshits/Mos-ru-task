@@ -11,6 +11,8 @@ from app.services.normalization import NormalizedRequest, tokenize
 class FoundItemMatch:
     item: FoundItem
     score: float
+    rule_score: float
+    vector_score: float | None
     matched_by: list[str]
 
 
@@ -24,12 +26,13 @@ class MatchingService:
         lost_date: date,
         station: MetroStation,
         candidates: list[FoundItem],
+        vector_scores: dict[int, float] | None = None,
         limit: int = 3,
     ) -> list[FoundItemMatch]:
         scored_matches = [
             match
             for item in candidates
-            if (match := self._score_item(normalized_request, lost_date, station, item)).score >= self.min_score
+            if (match := self._score_item(normalized_request, lost_date, station, item, vector_scores or {})).score >= self.min_score
         ]
         return sorted(scored_matches, key=lambda match: (-match.score, match.item.id))[:limit]
 
@@ -39,42 +42,57 @@ class MatchingService:
         lost_date: date,
         station: MetroStation,
         item: FoundItem,
+        vector_scores: dict[int, float],
     ) -> FoundItemMatch:
-        score = 0.0
+        rule_score = 0.0
         matched_by: list[str] = []
 
         if normalized_request.category and normalized_request.category == item.category:
-            score += 0.3
+            rule_score += 0.3
             matched_by.append("категория")
 
         if station.id == item.station_id:
-            score += 0.25
+            rule_score += 0.25
             matched_by.append("станция")
         elif self._is_nearby_station(station, item):
-            score += 0.12
+            rule_score += 0.12
             matched_by.append("близкая станция")
 
         date_score = self._date_score(lost_date, item.found_date)
         if date_score:
-            score += date_score
+            rule_score += date_score
             matched_by.append("дата")
 
         item_colors = {color.name for color in item.colors}
         request_colors = set(normalized_request.colors)
         if color_overlap := sorted(item_colors & request_colors):
-            score += min(0.15, 0.08 + 0.04 * len(color_overlap))
+            rule_score += min(0.15, 0.08 + 0.04 * len(color_overlap))
             matched_by.append("цвет")
 
         if normalized_request.brand and item.brand and normalized_request.brand.lower() == item.brand.lower():
-            score += 0.1
+            rule_score += 0.1
             matched_by.append("бренд")
 
         word_overlap = self._word_overlap(normalized_request, item)
         if word_overlap:
-            score += min(0.1, 0.02 * word_overlap)
+            rule_score += min(0.1, 0.02 * word_overlap)
             matched_by.append("описание")
 
-        return FoundItemMatch(item=item, score=round(min(score, 1.0), 2), matched_by=matched_by)
+        rule_score = min(rule_score, 1.0)
+        vector_score = vector_scores.get(item.id)
+        if vector_score is not None:
+            matched_by.append("semantic")
+            score = 0.65 * rule_score + 0.35 * vector_score
+        else:
+            score = rule_score
+
+        return FoundItemMatch(
+            item=item,
+            score=round(min(score, 1.0), 2),
+            rule_score=round(rule_score, 2),
+            vector_score=round(vector_score, 4) if vector_score is not None else None,
+            matched_by=matched_by,
+        )
 
     def _date_score(self, lost_date: date, found_date: date) -> float:
         days_delta = abs((found_date - lost_date).days)

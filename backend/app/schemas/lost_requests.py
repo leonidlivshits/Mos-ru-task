@@ -14,6 +14,8 @@ class LostRequestMatch(BaseModel):
     title: str
     public_description: str
     score: float
+    rule_score: float
+    vector_score: float | None
     matched_by: list[str]
     found_date: date
     station: str

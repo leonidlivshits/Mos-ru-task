@@ -35,3 +35,48 @@ class FoundItemsRepository:
         )
         result = await self.db.execute(statement)
         return list(result.unique().scalars())
+
+    async def list_without_embeddings(self) -> list[FoundItem]:
+        statement = (
+            select(FoundItem)
+            .where(FoundItem.description_embedding.is_(None))
+            .order_by(FoundItem.id)
+        )
+        result = await self.db.execute(statement)
+        return list(result.scalars())
+
+    async def list_top_k_by_embedding(
+        self,
+        query_embedding: list[float],
+        *,
+        limit: int = 10,
+    ) -> list[tuple[FoundItem, float]]:
+        distance = FoundItem.description_embedding.cosine_distance(query_embedding).label("vector_distance")
+        statement = (
+            select(FoundItem, distance)
+            .where(
+                FoundItem.status == "available",
+                FoundItem.description_embedding.is_not(None),
+            )
+            .options(
+                joinedload(FoundItem.colors),
+                joinedload(FoundItem.station),
+                joinedload(FoundItem.storage),
+            )
+            .order_by(distance)
+            .limit(limit)
+        )
+        result = await self.db.execute(statement)
+        rows = result.unique().all()
+        return [
+            (item, self._distance_to_similarity(vector_distance))
+            for item, vector_distance in rows
+        ]
+
+    async def update_embeddings(self, items: list[FoundItem], embeddings: list[list[float]]) -> None:
+        for item, embedding in zip(items, embeddings, strict=True):
+            item.description_embedding = embedding
+        await self.db.commit()
+
+    def _distance_to_similarity(self, distance: float) -> float:
+        return round(max(0.0, min(1.0, 1.0 - distance)), 4)

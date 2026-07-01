@@ -16,12 +16,14 @@ class LostRequestsRepository:
         lost_date: date,
         station_id: int,
         normalized_data: dict[str, object] | None = None,
+        query_embedding: list[float] | None = None,
     ) -> LostRequest:
         lost_request = LostRequest(
             description=description,
             lost_date=lost_date,
             station_id=station_id,
             normalized_data=normalized_data or {},
+            query_embedding=query_embedding,
             status="created",
         )
         self.db.add(lost_request)

@@ -7,6 +7,7 @@ from app.repositories.lost_requests import LostRequestsRepository
 from app.repositories.request_matches import RequestMatchesRepository
 from app.repositories.stations import StationsRepository
 from app.schemas.lost_requests import LostRequestCreate, LostRequestCreated, LostRequestMatch
+from app.services.embedding_service import EmbeddingServiceError, OpenRouterEmbeddingService
 from app.services.input_guard import InputGuard, InputGuardError
 from app.services.matching import MatchingService
 from app.services.normalization import NormalizationService
@@ -43,20 +44,39 @@ async def create_lost_request(
         )
 
     normalized_request = NormalizationService().normalize(description)
+    embedding_service = OpenRouterEmbeddingService()
+    try:
+        query_embedding = await embedding_service.embed_text(description, input_type="search_query")
+    except EmbeddingServiceError:
+        query_embedding = None
+
     lost_requests = LostRequestsRepository(db)
     lost_request = await lost_requests.create(
         description=description,
         lost_date=payload.lost_date,
         station_id=station.id,
         normalized_data=normalized_request.as_dict(),
+        query_embedding=query_embedding,
     )
 
-    candidates = await FoundItemsRepository(db).list_available_for_matching()
+    found_items = FoundItemsRepository(db)
+    vector_scores: dict[int, float] = {}
+    if query_embedding:
+        vector_matches = await found_items.list_top_k_by_embedding(query_embedding, limit=10)
+        candidates = [item for item, _score in vector_matches]
+        vector_scores = {item.id: score for item, score in vector_matches}
+    else:
+        candidates = []
+
+    if not candidates:
+        candidates = await found_items.list_available_for_matching()
+
     matches = MatchingService().find_matches(
         normalized_request=normalized_request,
         lost_date=payload.lost_date,
         station=station,
         candidates=candidates,
+        vector_scores=vector_scores,
         limit=3,
     )
 
@@ -77,6 +97,8 @@ async def create_lost_request(
                 title=match.item.title,
                 public_description=match.item.public_description,
                 score=match.score,
+                rule_score=match.rule_score,
+                vector_score=match.vector_score,
                 matched_by=match.matched_by,
                 found_date=match.item.found_date,
                 station=match.item.station.name,
