@@ -13,6 +13,12 @@ def test_normalization_extracts_category_color_and_brand() -> None:
     assert normalized.brand == "Nike"
 
 
+def test_normalization_extracts_ball_category() -> None:
+    normalized = NormalizationService().normalize("Потерял футбольный мяч")
+
+    assert normalized.category == "мяч"
+
+
 def test_matching_scores_category_station_date_color_and_brand() -> None:
     station = MetroStation(id=1, name="Тверская", line="Замоскворецкая", nearby_stations=[], interchange_nodes=[])
     storage = StorageLocation(id=1, name="Склад забытых вещей", address=None)
@@ -80,3 +86,35 @@ def test_matching_combines_rule_score_with_vector_score() -> None:
     assert matches[0].vector_score == 1.0
     assert matches[0].rule_score < matches[0].score
     assert "semantic" in matches[0].matched_by
+
+
+def test_matching_rejects_different_category_even_with_same_station_and_date() -> None:
+    station = MetroStation(id=1, name="Балтийская", line="МЦК", nearby_stations=[], interchange_nodes=[])
+    storage = StorageLocation(id=1, name="Склад забытых вещей", address=None)
+    item = FoundItem(
+        id=1,
+        title="Красная сумка Puma",
+        description="Красная спортивная сумка, найдена на станции",
+        public_description="Красная спортивная сумка, найдена на станции.",
+        private_features=[],
+        category="сумка",
+        brand="Puma",
+        found_date=date(2026, 6, 30),
+        station_id=1,
+        storage_id=1,
+        status="available",
+        station=station,
+        storage=storage,
+        colors=[],
+    )
+    normalized = NormalizationService().normalize("Потерял футбольный мяч")
+
+    matches = MatchingService().find_matches(
+        normalized_request=normalized,
+        lost_date=date(2026, 6, 30),
+        station=station,
+        candidates=[item],
+        vector_scores={1: 0.25},
+    )
+
+    assert matches == []

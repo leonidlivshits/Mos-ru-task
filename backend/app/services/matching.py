@@ -18,6 +18,9 @@ class FoundItemMatch:
 
 class MatchingService:
     min_score: float = 0.15
+    min_confident_score: float = 0.5
+    min_rule_score_without_category: float = 0.45
+    min_vector_score_without_category: float = 0.55
 
     def find_matches(
         self,
@@ -34,7 +37,10 @@ class MatchingService:
             for item in candidates
             if (match := self._score_item(normalized_request, lost_date, station, item, vector_scores or {})).score >= self.min_score
         ]
-        return sorted(scored_matches, key=lambda match: (-match.score, match.item.id))[:limit]
+        confident_matches = [
+            match for match in scored_matches if self._passes_confidence_gate(normalized_request, match)
+        ]
+        return sorted(confident_matches, key=lambda match: (-match.score, match.item.id))[:limit]
 
     def _score_item(
         self,
@@ -103,6 +109,20 @@ class MatchingService:
         if days_delta <= 5:
             return 0.08
         return 0.0
+
+    def _passes_confidence_gate(self, normalized_request: NormalizedRequest, match: FoundItemMatch) -> bool:
+        if normalized_request.category and normalized_request.category != match.item.category:
+            return False
+
+        if match.score < self.min_confident_score:
+            return False
+
+        if normalized_request.category:
+            return True
+
+        return match.rule_score >= self.min_rule_score_without_category or (
+            match.vector_score is not None and match.vector_score >= self.min_vector_score_without_category
+        )
 
     def _is_nearby_station(self, station: MetroStation, item: FoundItem) -> bool:
         item_station = item.station
