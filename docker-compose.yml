@@ -1,0 +1,61 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      APP_NAME: ${APP_NAME:-Mos.ru Lost Items Demo}
+      APP_ENV: ${APP_ENV:-local}
+      DATABASE_URL: postgresql+psycopg_async://${POSTGRES_USER:-lost_items}:${POSTGRES_PASSWORD:-lost_items_password}@db:5432/${POSTGRES_DB:-lost_items_demo}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_EMBEDDING_MODEL: ${OPENROUTER_EMBEDDING_MODEL:-openai/text-embedding-3-small}
+      OPENROUTER_EMBEDDING_DIMENSIONS: ${OPENROUTER_EMBEDDING_DIMENSIONS:-384}
+      OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-http://localhost:8000}
+      OPENROUTER_APP_TITLE: ${OPENROUTER_APP_TITLE:-Mos.ru Lost Items Demo}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./alembic.ini:/app/alembic.ini:ro
+      - ./backend:/app/backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  bot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    profiles:
+      - bot
+    environment:
+      APP_NAME: ${APP_NAME:-Mos.ru Lost Items Demo}
+      APP_ENV: ${APP_ENV:-local}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      BACKEND_API_URL: ${BACKEND_API_URL:-http://api:8000}
+    depends_on:
+      api:
+        condition: service_started
+    volumes:
+      - ./backend:/app/backend
+    command: python -m app.telegram_bot.main
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lost_items_demo}
+      POSTGRES_USER: ${POSTGRES_USER:-lost_items}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lost_items_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lost_items} -d ${POSTGRES_DB:-lost_items_demo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
